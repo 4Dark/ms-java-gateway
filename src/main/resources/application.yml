@@ -50,6 +50,22 @@ spring:
             - Path=/rest/biz/v1/**
           filters:
             - StripPrefix=0
+
+        # Ephemeral Chat Route: Forward /rest/biz/v1/ephemeral/** and /s/** to ms-java-biz
+        - id: ephemeral-rest-route
+          uri: lb://ms-java-biz
+          predicates:
+            - Path=/rest/biz/v1/ephemeral/**,/s/**
+          filters:
+            - StripPrefix=0
+
+        # Ephemeral WebSocket Route: Forward /ws/ephemeral/** to ms-java-biz
+        - id: ephemeral-ws-route
+          uri: lb:ws://ms-java-biz
+          predicates:
+            - Path=/ws/ephemeral/**
+          filters:
+            - StripPrefix=0
         
   security:
     login-url: /oauth2/authorization/casdoor
@@ -86,6 +102,10 @@ app:
         - /error
         - /oauth2/**
         - /.well-known/**
+        # 阅后即焚通讯空间（匿名访问）
+        - /s/**
+        - /rest/biz/v1/ephemeral/**
+        - /ws/ephemeral/**
 
 logging:
   level:

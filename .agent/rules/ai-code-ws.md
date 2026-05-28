@@ -55,3 +55,8 @@ trigger: always_on
 
 # Key Context (关键背景)
 该网关 (`ms-java-gateway`) 位于前端与后端服务之间。它是系统唯一的对外流量入口，负责统一的路由分发、流量控制，并对接 Casdoor 执行集中式的安全拦截与认证鉴权。它必须能高效处理高并发的长连接（如 SSE 流）。
+
+# Local Development & Restart Guide (本地开发与重启指南)
+- **端口配置**: 默认运行在 `8281` 端口。
+- **VS Code 启动配置**: 位于 `.vscode/launch.json` 中。包含必备的环境变量（如 Nacos）。
+- **AI 自动重启要求**: AI 在需要重启网关时，必须读取 `.vscode/launch.json` 获取正确的 JVM 参数与环境变量进行启动。

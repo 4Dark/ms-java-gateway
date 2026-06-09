@@ -1,5 +1,6 @@
 ---
-trigger: always_on
+trigger: on_demand
+description: ms-java-gateway 网关规范（已拆分）。深度参考见 skills/gateway-reference/SKILL.md
 ---
 
 # API Gateway (网关层) 开发规范

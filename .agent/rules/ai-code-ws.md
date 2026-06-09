@@ -1,5 +1,6 @@
 ---
-trigger: always_on
+trigger: on_demand
+description: ms-java-gateway 完整历史规范（已拆分）。核心内容已分别载入 core.md/coding-java.md/testing-java.md/devops.md，深度参考见 skills/gateway-reference/SKILL.md
 ---
 
 # Role (角色)

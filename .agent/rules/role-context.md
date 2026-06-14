@@ -26,3 +26,5 @@ com.dark.gateway/
 
 > 📖 编码规范详见 `coding-java.md`（打开 *.java 文件自动激活）
 > 🧪 测试规范详见 `testing-java.md`（打开 *Test.java 自动激活）
+
+> 💡 **经验总结 (Casdoor OIDC & JWT)**: 网关作为 BFF 层处理 OAuth2 回调签发内部 JWT 时，必须承担“身份属性翻译与打包”的基础设施职责，务必从 Casdoor 的 OIDC Claims 中提取 `displayName` 和 `picture` 存入生成的 JWT 载荷中，避免下游服务拿不到业务身份属性。

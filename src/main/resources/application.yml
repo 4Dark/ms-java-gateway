@@ -107,6 +107,13 @@ app:
         - /rest/biz/v1/ephemeral/**
         - /ws/ephemeral/**
         - /rest/biz/v1/ai-dev/tasks/callback
+        # 公告板资源 (精确限制 HttpMethod 防篡改)
+        - GET:/rest/biz/v1/notice-board-items
+        - GET:/rest/biz/v1/announcements
+        - GET:/rest/biz/v1/announcements/**
+        - POST:/rest/biz/v1/notice-board-items/*/track-view
+        # 公告图片资源（公开可访问，路径与上传接口对齐）
+        - GET:/rest/biz/v1/upload/images/**
 
 logging:
   level:

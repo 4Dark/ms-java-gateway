@@ -20,6 +20,7 @@ import org.springframework.security.web.server.ServerAuthenticationEntryPoint;
 import org.springframework.security.web.server.authentication.ServerAuthenticationSuccessHandler;
 import org.springframework.security.web.server.authentication.logout.RedirectServerLogoutSuccessHandler;
 import org.springframework.security.web.server.authentication.logout.ServerLogoutSuccessHandler;
+import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatcher;
 import org.springframework.security.web.server.util.matcher.ServerWebExchangeMatchers;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
@@ -34,8 +35,7 @@ import reactor.core.publisher.Mono;
 /**
  * 安全配置：CORS、OAuth2 登录流程、JWT 签发与 Cookie 写入、白名单规则。
  * <p>
- * 注意：此类中的 JWT 签发逻辑属于 OAuth2 回调流程的基础设施职责，
- * 不涉及领域业务逻辑，符合网关"零业务逻辑"原则。
+ * 注意：此类中的 JWT 签发逻辑属于 OAuth2 回调流程的基础设施职责， 不涉及领域业务逻辑，符合网关"零业务逻辑"原则。
  */
 @Configuration
 @EnableWebFluxSecurity
@@ -70,8 +70,9 @@ public class SecurityConfig {
         return http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .addFilterAt(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
-                .authorizeExchange(exchanges -> exchanges.pathMatchers(HttpMethod.OPTIONS)
-                        .permitAll().pathMatchers(ignoreUrls).permitAll()
+                .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers(HttpMethod.OPTIONS).permitAll()
+                        .matchers(getIgnoreMatchers()).permitAll()
                         .pathMatchers("/api/public/**", "/favicon.ico", "/actuator/**").permitAll()
                         .anyExchange().authenticated())
                 .oauth2Login(oauth2 -> oauth2
@@ -79,25 +80,35 @@ public class SecurityConfig {
                         .authenticationFailureHandler((webFilterExchange, exception) -> {
                             log.error("【OAuth2 登录失败】原因: {}", exception.getMessage());
                             return Mono.error(exception);
-                        })
-                        .authenticationSuccessHandler(authenticationSuccessHandler()))
+                        }).authenticationSuccessHandler(authenticationSuccessHandler()))
                 .exceptionHandling(exceptionHandling -> exceptionHandling
                         .authenticationEntryPoint(serverAuthenticationEntryPoint()))
                 .logout(logout -> logout
-                        .requiresLogout(ServerWebExchangeMatchers.pathMatchers(HttpMethod.GET, "/logout"))
+                        .requiresLogout(
+                                ServerWebExchangeMatchers.pathMatchers(HttpMethod.GET, "/logout"))
                         .logoutHandler((webFilterExchange, authentication) -> {
                             ResponseCookie jwtCookie = ResponseCookie.from("jwt_token", "")
-                                    .path("/")
-                                    .domain(cookieDomain)
-                                    .maxAge(0)
-                                    .httpOnly(true)
-                                    .secure(true)
-                                    .build();
+                                    .path("/").domain(cookieDomain).maxAge(0).httpOnly(true)
+                                    .secure(true).build();
                             webFilterExchange.getExchange().getResponse().addCookie(jwtCookie);
                             return Mono.empty();
-                        })
-                        .logoutSuccessHandler(logoutSuccessHandler()))
+                        }).logoutSuccessHandler(logoutSuccessHandler()))
                 .build();
+    }
+
+    private ServerWebExchangeMatcher[] getIgnoreMatchers() {
+        return ignoreWhiteProperties.getUrls().stream().map(url -> {
+            if (url.contains(":")) {
+                String[] parts = url.split(":", 2);
+                try {
+                    HttpMethod method = HttpMethod.valueOf(parts[0].toUpperCase());
+                    return ServerWebExchangeMatchers.pathMatchers(method, parts[1]);
+                } catch (IllegalArgumentException e) {
+                    log.warn("【安全配置】忽略路径白名单中存在非法的 HTTP Method: {}", url);
+                }
+            }
+            return ServerWebExchangeMatchers.pathMatchers(url);
+        }).toArray(ServerWebExchangeMatcher[]::new);
     }
 
     @Bean
@@ -117,9 +128,18 @@ public class SecurityConfig {
             String name = oidcUser.getName();
             String picture = oidcUser.getPicture();
 
+            String displayName = oidcUser.getClaimAsString("displayName");
+            if (displayName == null || displayName.isEmpty()) {
+                displayName = oidcUser.getClaimAsString("preferred_username");
+            }
+            if (displayName == null || displayName.isEmpty()) {
+                displayName = name;
+            }
+
             // 1. 生成 JWT
             SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
             String token = Jwts.builder().setSubject(userId).claim("name", name)
+                    .claim("displayName", displayName)
                     .claim("picture", picture != null ? picture : "").setIssuedAt(new Date())
                     .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // 24小时过期
                     .signWith(key).compact();
@@ -136,7 +156,8 @@ public class SecurityConfig {
             String redirectUri = webFilterExchange.getExchange().getRequest().getCookies()
                     .getFirst(RedirectSaveFilter.REDIRECT_URI_COOKIE_NAME) != null
                             ? webFilterExchange.getExchange().getRequest().getCookies()
-                                    .getFirst(RedirectSaveFilter.REDIRECT_URI_COOKIE_NAME).getValue()
+                                    .getFirst(RedirectSaveFilter.REDIRECT_URI_COOKIE_NAME)
+                                    .getValue()
                             : frontendUrl;
 
             // 清理 Cookie
